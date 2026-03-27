@@ -1,36 +1,36 @@
 async function initCheckout() {
+    console.log("Starting Garuda Indonesia Checkout...");
     try {
-        // 1. Call your Cloudflare Function
         const response = await fetch('/api/create-session', { method: 'POST' });
-        const sessionData = await response.json();
-
-        // Check if the backend actually returned a valid session
-        if (!sessionData.id || !sessionData.sessionData) {
-            throw new Error("Invalid session response from backend. Check your API Key/Merchant Account.");
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server responded with ${response.status}: ${errorText}`);
         }
 
-        // 2. Initialize Adyen Checkout using the 'session' object
+        const sessionData = await response.json();
+        console.log("Session created successfully:", sessionData.id);
+
         const checkout = await AdyenCheckout({
             environment: 'test',
-            clientKey: 'your_test_client_key...', // Double-check this is your CLIENT KEY, not API Key
+            clientKey: 'your_client_key_here', // MUST start with "test_"
             session: {
                 id: sessionData.id,
                 sessionData: sessionData.sessionData
             },
-            onPaymentCompleted: (result, component) => {
-                console.info(result);
-                alert("Status: " + result.resultCode);
-            },
-            onError: (error, component) => {
-                console.error(error.name, error.message);
-            }
+            onPaymentCompleted: (result) => alert("Booking Status: " + result.resultCode),
+            onError: (error) => console.error("Adyen SDK Error:", error)
         });
 
-        // 3. Create and mount the Drop-in
-        const dropin = checkout.create('dropin').mount('#dropin-container');
+        checkout.create('dropin').mount('#dropin-container');
+        console.log("Drop-in mounted!");
 
     } catch (e) {
-        console.error("Checkout Error:", e);
-        alert("Frontend Error: " + e.message);
+        console.error("Critical Failure:", e);
+        document.getElementById('dropin-container').innerHTML = 
+            `<div style="color:red; padding:20px;">
+                <strong>Demo Error:</strong> ${e.message}<br>
+                Check the Browser Console (F12) for details.
+            </div>`;
     }
 }
