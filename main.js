@@ -13,7 +13,7 @@ async function initCheckout() {
 
         const checkout = await AdyenCheckout({
             environment: 'test',
-            clientKey: 'your_client_key_here', // MUST start with "test_"
+            clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', // MUST start with "test_"
             session: {
                 id: sessionData.id,
                 sessionData: sessionData.sessionData
