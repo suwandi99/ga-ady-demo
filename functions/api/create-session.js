@@ -1,3 +1,5 @@
+// Triggering functions build
+
 export async function onRequestPost(context) {
   const { env } = context;
 
