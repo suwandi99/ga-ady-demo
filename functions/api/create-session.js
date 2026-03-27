@@ -10,9 +10,9 @@ export async function onRequestPost(context) {
       "X-API-Key": env.ADYEN_API_KEY, // We will set this in Cloudflare dashboard
     },
     body: JSON.stringify({
-      amount: { value: 150000000, currency: "IDR" }, // 1.5M IDR
+      amount: { value: 1500000, currency: "IDR" },
       reference: `GARUDA_${Date.now()}`,
-      returnUrl: "https://your-subdomain.pages.dev", 
+      returnUrl: "https://ga-ady-demo.pages.dev/", 
       merchantAccount: env.ADYEN_MERCHANT_ACCOUNT,
       countryCode: "ID",
       shopperLocale: "id-ID"
