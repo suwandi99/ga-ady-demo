@@ -2,7 +2,8 @@
 <html>
 <head>
     <title>Garuda Indonesia - Payment</title>
-    <link rel="stylesheet" href="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66/adyen.css">
+<link rel="stylesheet" 
+      href="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.css">
     <style>
         /* Garuda Indonesia Brand Customization */
         :root {
@@ -12,7 +13,11 @@
         }
         .header { background: #005495; color: white; padding: 20px; text-align: center; }
         #dropin-container { max-width: 500px; margin: 40px auto; }
-.header { background-color: #002561; color: #ffffff; padding: 15px; font-family: sans-serif; }
+    .header {
+    background: linear-gradient(135deg, #002561 0%, #2F6F7E 100%);
+    padding: 30px;
+    border-bottom: 4px solid #D4AF37; /* Garuda Gold accent */
+}
 .adyen-checkout__button--pay {
     background: #002561 !important; /* Garuda Midnight Blue */
     border-radius: 4px !important;
@@ -25,7 +30,10 @@
     <div class="header"><h1>Garuda Indonesia Checkout</h1></div>
     <div id="dropin-container"></div>
 
-    <script src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66/adyen.js"></script>
+<script 
+    src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.js" 
+    onload="initCheckout()">
+</script>
     <script src="main.js"></script>
 </body>
 </html>
