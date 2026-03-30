@@ -41,22 +41,22 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
 
         document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
 
-        // --- FIXED PRICE UPDATE LOGIC ---
-        // Target the specific Garuda MHTML classes for the Booking Summary
-        const currencyLabels = document.querySelectorAll('.currency');
-        const amountLabels = document.querySelectorAll('.total-amount');
+        // --- IMPROVED PRICE UPDATE LOGIC ---
+        // 1. Update Currency Text (e.g., SGD -> IDR)
+        document.querySelectorAll('.currency').forEach(el => {
+            el.innerText = currencyCode;
+        });
 
-        // Update all instances of currency (e.g., SGD to IDR)
-        currencyLabels.forEach(el => el.innerText = currencyCode);
-
-        // Update all instances of the amount (using converted value from backend)
-        amountLabels.forEach(el => {
-            // Adyen gives us minor units (e.g. 37970), convert to major (379.70)
-            const majorAmount = (sessionData.amount.value / 100).toLocaleString(undefined, {
+        // 2. Update Amount Text
+        document.querySelectorAll('.total-amount').forEach(el => {
+            // sessionData.amount.value is in minor units (e.g., 37970)
+            const numericValue = sessionData.amount.value / 100;
+            
+            // Format with commas and 2 decimal places
+            el.innerText = numericValue.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            el.innerText = majorAmount;
         });
 
         if (loader) loader.style.display = 'none';
@@ -69,13 +69,11 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     }
 };
 
-// Dropdown listener
-const countrySelector = document.getElementById('country-selector');
-if (countrySelector) {
-    countrySelector.addEventListener('change', (e) => {
-        const selectedOption = e.target.options[e.target.selectedIndex];
-        const country = e.target.value;
-        const currency = selectedOption.getAttribute('data-currency');
-        window.initCheckout(country, currency);
-    });
+// Ensure the dropdown listener is active
+const selector = document.getElementById('country-selector');
+if (selector) {
+    selector.onchange = (e) => {
+        const opt = e.target.options[e.target.selectedIndex];
+        window.initCheckout(e.target.value, opt.getAttribute('data-currency'));
+    };
 }
