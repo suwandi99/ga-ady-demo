@@ -1,35 +1,46 @@
-window.initCheckout = async function() {
+let checkout; // Store checkout instance globally to destroy it later
+
+window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
+    // 1. Clear existing container if re-initializing
+    const container = document.getElementById('dropin-container');
+    container.innerHTML = 'Connecting to Garuda Secure Payment...';
+
     try {
-        const response = await fetch('/api/create-session'); // Your Cloudflare function
+        // 2. Pass selection to backend
+        const response = await fetch('/api/create-session', {
+            method: 'POST',
+            body: JSON.stringify({ countryCode, currencyCode }),
+            headers: { 'Content-Type': 'application/json' }
+        });
         const sessionData = await response.json();
 
-        const checkout = await AdyenCheckout({
+        // 3. Initialize Adyen
+        checkout = await AdyenCheckout({
             environment: 'test',
-            clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', // Your Client Key
-            session: {
-                id: sessionData.id,
-                sessionData: sessionData.sessionData
-            },
-            onPaymentCompleted: (result) => {
-                if (result.resultCode === 'Authorised') {
-                    window.location.href = "/success"; 
-                }
-            },
-            // Branding to match Garuda Blue
-            theme: "dark" 
+            clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
+            session: sessionData,
+            onPaymentCompleted: (result) => alert(result.resultCode),
+            locale: countryCode === 'ID' ? "id-ID" : "en-US"
         });
 
-        const dropin = checkout.create('dropin', {
-            // Hide the internal Adyen "Pay" button so we use Garuda's red one
-            showPayButton: false 
-        }).mount('#dropin-container');
+        checkout.create('dropin', { showPayButton: false }).mount('#dropin-container');
 
-        // Link Garuda's Red Button to Adyen's Submission [cite: 604]
-        document.getElementById('ga-continue-btn').addEventListener('click', () => {
-            dropin.submit();
-        });
+        // Update UI price labels
+        document.querySelector('.currency').innerText = currencyCode;
+        // The backend should return the converted amount to display here
+        document.querySelector('.total-amount').innerText = (sessionData.amount.value / 100).toFixed(2);
 
     } catch (error) {
-        console.error("Checkout Error:", error);
+        console.error(error);
     }
-}
+};
+
+// Add Listener for Dropdown Change
+document.getElementById('country-selector').addEventListener('change', (e) => {
+    const selectedOption = e.target.options[e.target.selectedIndex];
+    const country = e.target.value;
+    const currency = selectedOption.getAttribute('data-currency');
+    
+    // Re-trigger the session call
+    window.initCheckout(country, currency);
+});
