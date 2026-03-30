@@ -1,14 +1,15 @@
-let checkoutInstance; // Global variable to track the current session
+let checkoutInstance; 
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
     const container = document.getElementById('dropin-container');
+    const successOverlay = document.getElementById('success-overlay');
     
     if (loader) loader.style.display = 'block';
-    container.innerHTML = ''; // Clear the container for the new load
+    if (successOverlay) successOverlay.style.display = 'none';
+    container.innerHTML = ''; 
 
     try {
-        // Fetch session from your Cloudflare Function
         const response = await fetch('/api/create-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -19,36 +20,62 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
 
         const sessionData = await response.json();
 
-        // Initialize Adyen Checkout
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
-            clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', // Ensure this is your CLIENT KEY
+            clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
             session: sessionData,
             onPaymentCompleted: (result) => {
-                if (result.resultCode === 'Authorised') {
+                if (result.resultCode === 'Authorised' || result.resultCode === 'Pending') {
                     document.getElementById('success-overlay').style.display = 'block';
+                } else {
+                    alert("Payment Status: " + result.resultCode);
                 }
             },
+            onError: (error) => console.error("Adyen Error:", error),
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        // Create and Mount Drop-in
         const dropin = checkoutInstance.create('dropin', {
-            showPayButton: false // We use the Garuda Red button instead
+            showPayButton: false 
         }).mount('#dropin-container');
 
-        // Link the Garuda Red Button to the new dropin instance
         document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
 
-        // Update UI Price
-        document.querySelector('.price-total-amount').innerText = 
-            `${currencyCode} ${(sessionData.amount.value / 100).toLocaleString()}`;
+        // --- FIXED PRICE UPDATE LOGIC ---
+        // Target the specific Garuda MHTML classes for the Booking Summary
+        const currencyLabels = document.querySelectorAll('.currency');
+        const amountLabels = document.querySelectorAll('.total-amount');
+
+        // Update all instances of currency (e.g., SGD to IDR)
+        currencyLabels.forEach(el => el.innerText = currencyCode);
+
+        // Update all instances of the amount (using converted value from backend)
+        amountLabels.forEach(el => {
+            // Adyen gives us minor units (e.g. 37970), convert to major (379.70)
+            const majorAmount = (sessionData.amount.value / 100).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            el.innerText = majorAmount;
+        });
 
         if (loader) loader.style.display = 'none';
 
     } catch (error) {
         console.error("Initialization Error:", error);
-        container.innerHTML = `<p style="color:red; text-align:center;">Error: ${error.message}</p>`;
+        container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">
+            <strong>Checkout Error:</strong> ${error.message}</p>`;
         if (loader) loader.style.display = 'none';
     }
 };
+
+// Dropdown listener
+const countrySelector = document.getElementById('country-selector');
+if (countrySelector) {
+    countrySelector.addEventListener('change', (e) => {
+        const selectedOption = e.target.options[e.target.selectedIndex];
+        const country = e.target.value;
+        const currency = selectedOption.getAttribute('data-currency');
+        window.initCheckout(country, currency);
+    });
+}
