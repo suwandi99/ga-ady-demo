@@ -1,4 +1,5 @@
-export async function onRequestPost(context) {
+export async function onRequest(context) { 
+// Removing "Post" lets us test the link directly in the browser
   const { env } = context;
   try {
     const response = await fetch("https://checkout-test.adyen.com/v71/sessions", {
