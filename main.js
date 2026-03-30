@@ -1,4 +1,5 @@
-async function initCheckout() {
+// Add "window." to the front to make it globally visible to the HTML
+window.initCheckout = async function() {
     console.log("Starting Garuda Indonesia Checkout...");
     try {
         const response = await fetch('/api/create-session', { method: 'POST' });
