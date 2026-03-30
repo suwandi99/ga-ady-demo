@@ -14,6 +14,10 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         });
         const sessionData = await response.json();
 
+        // Inside your main.js after 'const sessionData = await response.json();'
+document.querySelector('.price-total-amount').innerText = 
+    `${currencyCode} ${(sessionData.amount.value / 100).toLocaleString()}`;
+
         // 3. Initialize Adyen
         checkout = await AdyenCheckout({
             environment: 'test',
