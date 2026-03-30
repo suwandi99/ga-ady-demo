@@ -1,4 +1,4 @@
-let checkoutInstance; 
+let checkoutInstance; // Global variable to track the session
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
@@ -7,9 +7,21 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     
     if (loader) loader.style.display = 'block';
     if (successOverlay) successOverlay.style.display = 'none';
+
+    // --- STEP 1: CLEAN RESET OF THE DROP-IN ---
+    // Remove the old instance from memory and clear the HTML container
+    if (checkoutInstance) {
+        try {
+            // This properly shuts down the previous SDK instance
+            checkoutInstance.unmount(); 
+        } catch (e) {
+            console.log("No existing instance to unmount");
+        }
+    }
     container.innerHTML = ''; 
 
     try {
+        // 1. Fetch new session from your specific path
         const response = await fetch('/api/create-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -20,6 +32,8 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
 
         const sessionData = await response.json();
 
+        // 2. Initialize Adyen Checkout with your specific Client Key
+        // We assign it to the global checkoutInstance so we can destroy it next time
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
@@ -35,24 +49,18 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
+        // 3. Create and Mount the NEW Drop-in
         const dropin = checkoutInstance.create('dropin', {
             showPayButton: false 
         }).mount('#dropin-container');
 
+        // 4. Update the Garuda Red Button to point to the NEW dropin
         document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
 
-        // --- IMPROVED PRICE UPDATE LOGIC ---
-        // 1. Update Currency Text (e.g., SGD -> IDR)
-        document.querySelectorAll('.currency').forEach(el => {
-            el.innerText = currencyCode;
-        });
-
-        // 2. Update Amount Text
+        // 5. Update UI Price Labels
+        document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
         document.querySelectorAll('.total-amount').forEach(el => {
-            // sessionData.amount.value is in minor units (e.g., 37970)
             const numericValue = sessionData.amount.value / 100;
-            
-            // Format with commas and 2 decimal places
             el.innerText = numericValue.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
@@ -69,7 +77,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     }
 };
 
-// Ensure the dropdown listener is active
+// Dropdown listener
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
