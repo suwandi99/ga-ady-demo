@@ -1,4 +1,5 @@
-let checkoutInstance; // Global variable to track the session
+// Track instances globally so we can clean them up
+let checkoutInstance = null;
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
@@ -8,20 +9,12 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     if (loader) loader.style.display = 'block';
     if (successOverlay) successOverlay.style.display = 'none';
 
-    // --- STEP 1: CLEAN RESET OF THE DROP-IN ---
-    // Remove the old instance from memory and clear the HTML container
-    if (checkoutInstance) {
-        try {
-            // This properly shuts down the previous SDK instance
-            checkoutInstance.unmount(); 
-        } catch (e) {
-            console.log("No existing instance to unmount");
-        }
-    }
-    container.innerHTML = ''; 
+    // 1. HARD RESET: Clear the container and the global instance
+    container.innerHTML = '<p style="text-align:center;">Updating local payment methods...</p>';
+    checkoutInstance = null;
 
     try {
-        // 1. Fetch new session from your specific path
+        // 2. Fetch new session from your specific path
         const response = await fetch('/api/create-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -29,11 +22,10 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         });
 
         if (!response.ok) throw new Error("Backend failed to create session");
-
         const sessionData = await response.json();
 
-        // 2. Initialize Adyen Checkout with your specific Client Key
-        // We assign it to the global checkoutInstance so we can destroy it next time
+        // 3. Initialize Adyen Checkout
+        // Explicitly set the configuration for the new country/currency
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
@@ -46,18 +38,24 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
                 }
             },
             onError: (error) => console.error("Adyen Error:", error),
-            locale: countryCode === 'ID' ? "id-ID" : "en-GB"
+            locale: countryCode === 'ID' ? "id-ID" : "en-GB",
+            paymentMethodsConfiguration: {
+                card: {
+                    hasHolderName: true,
+                    holderNameRequired: true
+                }
+            }
         });
 
-        // 3. Create and Mount the NEW Drop-in
+        // 4. Mount the NEW Drop-in
         const dropin = checkoutInstance.create('dropin', {
             showPayButton: false 
         }).mount('#dropin-container');
 
-        // 4. Update the Garuda Red Button to point to the NEW dropin
+        // 5. Re-link the Garuda Red Button
         document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
 
-        // 5. Update UI Price Labels
+        // 6. Force Update UI Price Labels
         document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
         document.querySelectorAll('.total-amount').forEach(el => {
             const numericValue = sessionData.amount.value / 100;
@@ -77,11 +75,13 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     }
 };
 
-// Dropdown listener
-const selector = document.getElementById('country-selector');
-if (selector) {
-    selector.onchange = (e) => {
-        const opt = e.target.options[e.target.selectedIndex];
-        window.initCheckout(e.target.value, opt.getAttribute('data-currency'));
+// Dropdown listener setup
+const countrySelector = document.getElementById('country-selector');
+if (countrySelector) {
+    countrySelector.onchange = (e) => {
+        const selectedOption = e.target.options[e.target.selectedIndex];
+        const country = e.target.value;
+        const currency = selectedOption.getAttribute('data-currency');
+        window.initCheckout(country, currency);
     };
 }
