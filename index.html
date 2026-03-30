@@ -1,220 +1,90 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Garuda Indonesia - Secure Payment</title>
+    <title>Garuda Indonesia</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- Garuda Indonesia UI Revamp --- */
+        /* Extracting essential Garuda Styles from MHTML [cite: 5] */
+        body { background: #f5f5f5; font-family: 'Poppins', sans-serif; margin: 0; }
+        #main-header { background: #fff; border-bottom-left-radius: 125px; margin-bottom: 42px; padding: 10px 15px; }
+        .time-header { background: #28447a; color: #fff; text-align: center; padding: 12px; border-bottom-left-radius: 125px; }
         
-        /* 1. Reset and Main Layout */
-        * { box-sizing: border-box; font-family: sans-serif; }
-        body { background-color: #f7fbff; margin: 0; padding: 0; color: #333; }
+        #main-container { display: flex; max-width: 1200px; margin: 0 auto; padding: 20px; gap: 20px; }
+        #payment-options-wrapper { flex: 1; background: #fff; border-radius: 8px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .booking-info-container { width: 330px; }
         
-        /* 2. Top Header and Countdown Bar (Matches image_1.png) */
-        .garuda-header {
-            background-color: #ffffff;
-            padding: 15px 10%;
-            border-bottom: 2px solid #D4AF37; /* Gold Accent */
-            text-align: center;
-        }
-        .ga-logo { height: 40px; }
+        .payment-method-title { color: #24437f; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+        .blue-wrapper { background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .booking-info { background: #fff; border-radius: 8px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
         
-        .timer-bar {
-            background-color: #002561; /* Midnight Blue */
-            color: #ffffff;
-            text-align: center;
-            padding: 8px 0;
-            font-size: 14px;
-        }
-
-        /* 3. The Main Two-Column Container */
-        .checkout-main-container {
-            display: flex;
-            max-width: 1200px;
-            margin: 30px auto;
-            padding: 0 20px;
-            gap: 25px; /* Space between columns */
-        }
-        
-        /* Left Column: The Adyen Payment form */
-        .left-payment-column {
-            flex: 2; /* 66% width */
-            background-color: #ffffff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-        
-        /* Right Column: Voucher and Booking Summary */
-        .right-sidebar-column {
-            flex: 1; /* 33% width */
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        /* --- Sidebar UI Styling (Voucher, Booking) --- */
-        .sidebar-box {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-        .sidebar-title {
-            color: #002561;
-            margin-top: 0;
-            font-size: 18px;
-            border-bottom: 2px solid #D4AF37; /* Gold Accent */
-            padding-bottom: 5px;
-        }
-
-        /* Voucher Section */
-        .voucher-input-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .voucher-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .voucher-apply-btn {
-            background-color: #E31D2B; /* Garuda Red */
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        /* Your Booking Section (Flight Details) */
-        .flight-info-group {
-            margin-top: 15px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        .flight-heading { font-weight: bold; color: #555; margin-bottom: 3px; }
-        .flight-date { font-weight: bold; font-size: 14px; margin-top: 10px;}
-        .flight-time-city { color: #666;}
-        .price-summary-line {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
-        }
-        .price-total-label { font-weight: bold; font-size: 15px; color: #002561;}
-        .price-total-amount { font-weight: bold; font-size: 20px; color: #002561;}
-        .minor-text { color: #888; font-size: 11px;}
-
-        /* Final Primary Button (Redeployed from Adyen Drop-in to Sidebar) */
-        .sidebar-continue-btn {
-            background: linear-gradient(135deg, #FF6F61 0%, #D81C2B 100%);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 15px;
-            margin-top: 20px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(227, 29, 43, 0.3);
-            text-transform: uppercase;
-        }
-
-        /* --- Footer --- */
-        .garuda-footer {
-            background-color: #002561;
-            color: white;
-            padding: 15px 10%;
-            font-size: 11px;
-            text-align: center;
-            margin-top: 50px;
-        }
-
-        /* Hide the native Adyen primary button (we are using the sidebar one) */
-        .adyen-checkout__button--pay { display: none !important; }
-
+        /* Buttons [cite: 1008, 1011] */
+        .btn-red { background: #c42812; color: #fff; border: none; border-radius: 20px; height: 40px; width: 100%; cursor: pointer; font-weight: 600; }
+        .price-total-amount { font-size: 18px; font-weight: 700; color: #24437f; float: right; }
+        .flight-info-group { border-bottom: 1px solid #e5e5e5; padding: 10px 0; color: #939191; }
+        h3 { color: #24437f; font-size: 14px; text-transform: uppercase; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="garuda-header">
-        <h1>GARUDA INDONESIA (Simulation)</h1>
+<header id="main-header">
+    <div class="container wrapper">
+        <img src="https://pay.garuda-indonesia.com/images/logo.png" style="height:54px;">
+        <div class="steps"><img src="https://pay.garuda-indonesia.com/images/steps/step3.png" style="height:54px;"></div>
     </div>
-
-    <div class="timer-bar">
-        Booking/Transaction expires in: <span id="countdown-timer">15:00</span>
+    <div class="time-header">
+        Booking/Transaction expires in: <time id="countdown">00:30:00</time>
     </div>
+</header>
 
-    <div class="checkout-main-container">
-
-        <div class="left-payment-column">
-            <h2 class="sidebar-title">Payment Method</h2>
-            <div id="dropin-container">
-                <p style="text-align:center;">Connecting to Garuda Secure Payment...</p>
+<section id="main-container">
+    <div id="payment-options-wrapper">
+        <h5 class="payment-method-title">Payment Method</h5>
+        <div id="dropin-container">
             </div>
+    </div>
+
+    <div class="booking-info-container">
+        <div class="blue-wrapper">
+            <h5 style="color:#24437f; font-weight:600;">Voucher</h5>
+            <input type="text" placeholder="Input 8 Digit Voucher Code" style="width:100%; padding:10px; border-radius:20px; border:1px dotted #ccc; margin-bottom:10px;">
+            <button class="btn-red">Apply</button>
         </div>
 
-        <div class="right-sidebar-column">
-
-            <div class="sidebar-box">
-                <h3 class="sidebar-title">Voucher</h3>
-                <div class="voucher-input-group">
-                    <input type="text" class="voucher-input" placeholder="Input 8 Digit Voucher Code">
-                    <button class="voucher-apply-btn">Apply</button>
-                </div>
+        <aside class="booking-info">
+            <h2 style="color:#24437f; font-size:20px; border-bottom:1px solid #e5e5e5; padding-bottom:10px;">Your Booking</h2>
+            
+            <div class="flight-info-group">
+                <h3>1 traveller</h3>
+                <span>1 adult</span>
             </div>
 
-            <div class="sidebar-box">
-                <h3 class="sidebar-title">Your Booking</h3>
-                
-                <div class="flight-info-group">
-                    <div class="flight-heading">1 TRAVELLER</div>
-                    <div>1 adult</div>
-                </div>
-
-                <div class="flight-info-group">
-                    <div class="flight-date">MON 27 APR 2026</div>
-                    <div class="flight-time-city">07:25 Singapore (SIN)</div>
-                    <div class="flight-time-city">08:25 Jakarta (CGK)</div>
-                </div>
-
-                <div class="flight-info-group">
-                    <div class="flight-date">WED 29 APR 2026</div>
-                    <div class="flight-time-city">09:05 Jakarta (CGK)</div>
-                    <div class="flight-time-city">11:55 Singapore (SIN)</div>
-                </div>
-
-                <div class="price-summary-line">
-                    <div>
-                        <div class="price-total-label">TOTAL</div>
-                        <div class="minor-text">(Total for all travellers including taxes and fees)</div>
-                    </div>
-                    <div>
-                        <div class="price-total-amount">IDR 1,500,000</div>
-                        <div class="minor-text">(Minor units 1,500,000.00)</div>
-                    </div>
-                </div>
-
-                <button class="sidebar-continue-btn" id="ga-final-continue-btn">Continue Payment</button>
+            <div class="flight-info-group">
+                <h3>Mon 27 Apr 2026</h3>
+                <div>07:25 Singapore (SIN)</div>
+                <div>08:25 Jakarta (CGK)</div>
             </div>
-        </div>
-    </div>
 
-    <div class="garuda-footer">
-        © 2026. ATI Business Group. All right reserved. Simulated for Demonstration. | Privacy Policy | Contact Us
-    </div>
+            <div class="flight-info-group">
+                <h3>Wed 29 Apr 2026</h3>
+                <div>09:05 Jakarta (CGK)</div>
+                <div>11:55 Singapore (SIN)</div>
+            </div>
 
-    <script src="main.js"></script>
-    <script src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.js" onload="initCheckout()"></script>
-    
+            <div style="margin-top:20px;">
+                <span style="font-weight:700;">TOTAL</span>
+                <span class="price-total-amount">SGD 379.70</span>
+                <p style="font-size:10px; color:#939191; clear:both;">Total for all travellers (including taxes and fees)</p>
+            </div>
+
+            <button class="btn-red" id="ga-continue-btn" style="margin-top:20px;">Continue Payment</button>
+        </aside>
+    </div>
+</section>
+
+<script src="main.js"></script>
+<script src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.js" onload="initCheckout()"></script>
 </body>
 </html>
