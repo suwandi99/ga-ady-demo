@@ -1,6 +1,7 @@
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
-    loader.style.display = 'block'; // Show loader
+    const successOverlay = document.getElementById('success-overlay');
+    loader.style.display = 'block';
 
     try {
         const response = await fetch('/api/create-session', {
@@ -10,27 +11,37 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         });
         const sessionData = await response.json();
 
-        // Destroy previous instance if it exists
-        if (window.checkoutInstance) {
-            document.getElementById('dropin-container').innerHTML = '';
-        }
-
-        window.checkoutInstance = await AdyenCheckout({
+        const checkout = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
             session: sessionData,
-            onPaymentCompleted: (result) => alert(result.resultCode)
+            onPaymentCompleted: (result) => {
+                console.log("Payment Result:", result.resultCode);
+                
+                // If payment is successful, show the Garuda Success UI
+                if (result.resultCode === 'Authorised' || result.resultCode === 'Pending') {
+                    successOverlay.classList.remove('hide');
+                    successOverlay.style.display = 'block';
+                } else {
+                    alert("Payment Status: " + result.resultCode);
+                }
+            },
+            onError: (error) => console.error(error)
         });
 
-        window.checkoutInstance.create('dropin', { 
+        const dropin = checkout.create('dropin', { 
             showPayButton: false 
         }).mount('#dropin-container');
 
-        // Update UI Text
+        // Update Price UI
         document.querySelector('.price-total-amount').innerText = 
             `${currencyCode} ${(sessionData.amount.value / 100).toLocaleString()}`;
 
-        loader.style.display = 'none'; // Hide loader when done
+        loader.style.display = 'none';
+
+        // Link the external Garuda Red Button
+        document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
+
     } catch (error) {
         console.error(error);
         loader.style.display = 'none';
