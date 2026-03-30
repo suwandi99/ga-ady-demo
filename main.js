@@ -1,6 +1,6 @@
 window.initCheckout = async function() {
     try {
-        const response = await fetch('/create-session'); // Your Cloudflare function
+        const response = await fetch('/api/create-session'); // Your Cloudflare function
         const sessionData = await response.json();
 
         const checkout = await AdyenCheckout({
