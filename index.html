@@ -83,10 +83,11 @@
 <body>
 
 <header id="main-header">
-    <div class="container wrapper">
-        <a href="#">
-            <img src="https://pay.garuda-indonesia.com/images/logo.png" class="img-logo" style="height:54px;">
+    <div class="wrapper">
+        <a href="/">
+            <img src="https://pay.garuda-indonesia.com/images/logo.png" class="img-logo" alt="Garuda Indonesia">
         </a>
+        
         <span class="steps">
             <ul>
                 <li>
@@ -104,8 +105,11 @@
             </ul>
         </span>
     </div>
+    
     <div class="time-header">
-        Booking/Transaction expires in: <time id="countdown">00:30:45</time>
+        <div class="payment-time-countdown">
+            Booking/Transaction expires in: <time id="countdown-timer">00:30:00</time>
+        </div>
     </div>
 </header>
 
