@@ -1,39 +1,220 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>Garuda Indonesia - Payment</title>
-<link rel="stylesheet" 
-      href="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garuda Indonesia - Secure Payment</title>
+    <link rel="stylesheet" href="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.css">
+    
     <style>
-        /* Garuda Indonesia Brand Customization */
-        :root {
-    --adyen-sdk-color-background-secondary: #002561; /* Garuda Midnight Blue */
-    --adyen-sdk-color-primary: #2f6f7e; /* Garuda Ming Teal */
-    --adyen-sdk-border-radius: 2px;
+        /* --- Garuda Indonesia UI Revamp --- */
+        
+        /* 1. Reset and Main Layout */
+        * { box-sizing: border-box; font-family: sans-serif; }
+        body { background-color: #f7fbff; margin: 0; padding: 0; color: #333; }
+        
+        /* 2. Top Header and Countdown Bar (Matches image_1.png) */
+        .garuda-header {
+            background-color: #ffffff;
+            padding: 15px 10%;
+            border-bottom: 2px solid #D4AF37; /* Gold Accent */
+            text-align: center;
         }
-        .header { background: #005495; color: white; padding: 20px; text-align: center; }
-        #dropin-container { max-width: 500px; margin: 40px auto; }
-    .header {
-    background: linear-gradient(135deg, #002561 0%, #2F6F7E 100%);
-    padding: 30px;
-    border-bottom: 4px solid #D4AF37; /* Garuda Gold accent */
-}
-.adyen-checkout__button--pay {
-    background: #002561 !important; /* Garuda Midnight Blue */
-    border-radius: 4px !important;
-    text-transform: uppercase;
-    font-weight: bold;
-}
+        .ga-logo { height: 40px; }
+        
+        .timer-bar {
+            background-color: #002561; /* Midnight Blue */
+            color: #ffffff;
+            text-align: center;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        /* 3. The Main Two-Column Container */
+        .checkout-main-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+            gap: 25px; /* Space between columns */
+        }
+        
+        /* Left Column: The Adyen Payment form */
+        .left-payment-column {
+            flex: 2; /* 66% width */
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        
+        /* Right Column: Voucher and Booking Summary */
+        .right-sidebar-column {
+            flex: 1; /* 33% width */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        /* --- Sidebar UI Styling (Voucher, Booking) --- */
+        .sidebar-box {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .sidebar-title {
+            color: #002561;
+            margin-top: 0;
+            font-size: 18px;
+            border-bottom: 2px solid #D4AF37; /* Gold Accent */
+            padding-bottom: 5px;
+        }
+
+        /* Voucher Section */
+        .voucher-input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .voucher-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .voucher-apply-btn {
+            background-color: #E31D2B; /* Garuda Red */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* Your Booking Section (Flight Details) */
+        .flight-info-group {
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .flight-heading { font-weight: bold; color: #555; margin-bottom: 3px; }
+        .flight-date { font-weight: bold; font-size: 14px; margin-top: 10px;}
+        .flight-time-city { color: #666;}
+        .price-summary-line {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .price-total-label { font-weight: bold; font-size: 15px; color: #002561;}
+        .price-total-amount { font-weight: bold; font-size: 20px; color: #002561;}
+        .minor-text { color: #888; font-size: 11px;}
+
+        /* Final Primary Button (Redeployed from Adyen Drop-in to Sidebar) */
+        .sidebar-continue-btn {
+            background: linear-gradient(135deg, #FF6F61 0%, #D81C2B 100%);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(227, 29, 43, 0.3);
+            text-transform: uppercase;
+        }
+
+        /* --- Footer --- */
+        .garuda-footer {
+            background-color: #002561;
+            color: white;
+            padding: 15px 10%;
+            font-size: 11px;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        /* Hide the native Adyen primary button (we are using the sidebar one) */
+        .adyen-checkout__button--pay { display: none !important; }
+
     </style>
 </head>
 <body>
-    <div class="header"><h1>Garuda Indonesia Checkout</h1></div>
-    <div id="dropin-container"></div>
 
-<script src="main.js"></script>
+    <div class="garuda-header">
+        <h1>GARUDA INDONESIA (Simulation)</h1>
+    </div>
 
-    <script 
-        src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.js" 
-        onload="initCheckout()">
-    </script>
+    <div class="timer-bar">
+        Booking/Transaction expires in: <span id="countdown-timer">15:00</span>
+    </div>
+
+    <div class="checkout-main-container">
+
+        <div class="left-payment-column">
+            <h2 class="sidebar-title">Payment Method</h2>
+            <div id="dropin-container">
+                <p style="text-align:center;">Connecting to Garuda Secure Payment...</p>
+            </div>
+        </div>
+
+        <div class="right-sidebar-column">
+
+            <div class="sidebar-box">
+                <h3 class="sidebar-title">Voucher</h3>
+                <div class="voucher-input-group">
+                    <input type="text" class="voucher-input" placeholder="Input 8 Digit Voucher Code">
+                    <button class="voucher-apply-btn">Apply</button>
+                </div>
+            </div>
+
+            <div class="sidebar-box">
+                <h3 class="sidebar-title">Your Booking</h3>
+                
+                <div class="flight-info-group">
+                    <div class="flight-heading">1 TRAVELLER</div>
+                    <div>1 adult</div>
+                </div>
+
+                <div class="flight-info-group">
+                    <div class="flight-date">MON 27 APR 2026</div>
+                    <div class="flight-time-city">07:25 Singapore (SIN)</div>
+                    <div class="flight-time-city">08:25 Jakarta (CGK)</div>
+                </div>
+
+                <div class="flight-info-group">
+                    <div class="flight-date">WED 29 APR 2026</div>
+                    <div class="flight-time-city">09:05 Jakarta (CGK)</div>
+                    <div class="flight-time-city">11:55 Singapore (SIN)</div>
+                </div>
+
+                <div class="price-summary-line">
+                    <div>
+                        <div class="price-total-label">TOTAL</div>
+                        <div class="minor-text">(Total for all travellers including taxes and fees)</div>
+                    </div>
+                    <div>
+                        <div class="price-total-amount">IDR 1,500,000</div>
+                        <div class="minor-text">(Minor units 1,500,000.00)</div>
+                    </div>
+                </div>
+
+                <button class="sidebar-continue-btn" id="ga-final-continue-btn">Continue Payment</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="garuda-footer">
+        © 2026. ATI Business Group. All right reserved. Simulated for Demonstration. | Privacy Policy | Contact Us
+    </div>
+
+    <script src="main.js"></script>
+    <script src="https://checkoutshopper-test.adyen.com/checkoutshopper/sdk/5.66.0/adyen.js" onload="initCheckout()"></script>
+    
+</body>
 </html>
