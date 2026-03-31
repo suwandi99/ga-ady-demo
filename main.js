@@ -6,7 +6,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     const container = document.getElementById('dropin-container');
     const successOverlay = document.getElementById('success-overlay');
     
-    // 1. Extract redirect markers from the URL
+    // 1. Check URL for redirect markers
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('sessionId');
     const redirectResult = urlParams.get('redirectResult');
@@ -15,87 +15,80 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     if (successOverlay) successOverlay.style.display = 'none';
 
     try {
-        let sessionData;
-
-        // 2. Determine Session Path
+        // 2. Logic: If we have a redirectResult, we ONLY handle that.
         if (sessionId && redirectResult && !isManualChange) {
-            // REDIRECT RETURN: Use the existing ID from the URL
-            sessionData = { id: sessionId };
-        } else {
-            // FRESH START: Wipe old instances and fetch new session
-            if (activeDropin) { 
-                activeDropin.unmount(); 
-                activeDropin = null; 
-            }
-            container.innerHTML = ''; 
-            checkoutInstance = null;
-
-            const response = await fetch('/api/create-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ countryCode, currencyCode })
-            });
+            console.log("Processing redirect for session:", sessionId);
             
-            if (!response.ok) throw new Error("Backend failed to create session");
-            sessionData = await response.json();
+            const checkout = await AdyenCheckout({
+                environment: 'test',
+                clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
+                session: { id: sessionId },
+                onPaymentCompleted: (result) => {
+                    console.log("Redirect Result:", result.resultCode);
+                    if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
+                        successOverlay.style.display = 'block';
+                    } else {
+                        alert("Payment Status: " + result.resultCode);
+                    }
+                    // CLEANUP: Remove parameters from URL so the page works normally on refresh
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    if (loader) loader.style.display = 'none';
+                    
+                    // Re-init a fresh checkout so the UI isn't empty
+                    window.initCheckout('SG', 'SGD', true);
+                },
+                onError: (err) => {
+                    console.error("Redirect Error:", err);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    window.initCheckout('SG', 'SGD', true);
+                }
+            });
+            return; // Exit early; the callback handles the rest
         }
 
-        // 3. Initialize Adyen Checkout
+        // 3. FRESH START MODE (Standard Load or Country Switch)
+        if (activeDropin) { activeDropin.unmount(); activeDropin = null; }
+        container.innerHTML = ''; 
+        checkoutInstance = null;
+
+        const response = await fetch('/api/create-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ countryCode, currencyCode })
+        });
+        
+        const sessionData = await response.json();
+
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
             session: sessionData,
             onPaymentCompleted: (result) => {
-                console.log("Final Payment Result:", result.resultCode);
-                // Broad success check for redirect methods
-                if (['Authorised', 'Pending', 'Received', 'Success'].includes(result.resultCode)) {
-                    if (successOverlay) successOverlay.style.display = 'block';
-                    // Clean URL so refresh doesn't loop the success
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                } else {
-                    alert("Payment Status: " + result.resultCode);
+                if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
+                    successOverlay.style.display = 'block';
                 }
-                if (loader) loader.style.display = 'none';
-            },
-            onError: (error) => {
-                console.error("Adyen Error:", error);
-                if (loader) loader.style.display = 'none';
             },
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        // 4. THE REDIRECT FIX: 
-        // If we have a redirectResult, we tell the checkout instance to process it explicitly
-        if (sessionId && redirectResult && !isManualChange) {
-            // This forces the SDK to evaluate the URL parameters and trigger onPaymentCompleted
-            await checkoutInstance.submitDetails({ details: { redirectResult } });
-            return; // Stop here; the callback above will handle the UI
-        }
-
-        // 5. Normal Mount (for fresh sessions)
         activeDropin = checkoutInstance.create('dropin', { showPayButton: false });
         activeDropin.mount('#dropin-container');
 
         // Link Garuda Red Button
-        const gaBtn = document.getElementById('ga-continue-btn');
-        if (gaBtn) {
-            gaBtn.onclick = (e) => {
-                e.preventDefault();
-                activeDropin.submit();
-            };
-        }
+        document.getElementById('ga-continue-btn').onclick = (e) => {
+            e.preventDefault();
+            if (activeDropin) activeDropin.submit();
+        };
 
         // Update UI Prices
-        if (!sessionId || isManualChange) {
-            document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
-            document.querySelectorAll('.total-amount').forEach(el => {
-                const val = sessionData.amount.value / 100;
-                el.innerText = val.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
+        document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
+        document.querySelectorAll('.total-amount').forEach(el => {
+            const val = sessionData.amount.value / 100;
+            el.innerText = val.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             });
-        }
+        });
 
         if (loader) loader.style.display = 'none';
 
@@ -113,3 +106,6 @@ if (selector) {
         window.initCheckout(e.target.value, opt.getAttribute('data-currency'), true);
     };
 }
+
+// Initial Call
+window.initCheckout('SG', 'SGD');
