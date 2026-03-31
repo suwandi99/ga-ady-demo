@@ -6,7 +6,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     const container = document.getElementById('dropin-container');
     const successOverlay = document.getElementById('success-overlay');
     
-    // 1. Check for existing session in URL (Redirect Return)
+    // 1. Detect if we are returning from a redirect
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('sessionId');
 
@@ -16,30 +16,25 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     try {
         let sessionData;
 
-        // 2. Determine Session Source
+        // 2. Determine Session Logic
         if (sessionId && !isManualChange) {
-            // Case: Shopper returned from Alipay
             sessionData = { id: sessionId };
         } else {
-            // Case: Initial load or manual Country Switch
-            // Clean up previous instance to avoid SecureFields errors
-            if (activeDropin) { 
-                activeDropin.unmount(); 
-                activeDropin = null; 
-            }
+            if (activeDropin) { activeDropin.unmount(); activeDropin = null; }
             container.innerHTML = ''; 
-            
+            checkoutInstance = null;
+
             const response = await fetch('/api/create-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ countryCode, currencyCode })
             });
             
-            if (!response.ok) throw new Error("Backend failed to create session");
+            if (!response.ok) throw new Error("Backend failed");
             sessionData = await response.json();
         }
 
-        // 3. Create THE ONLY Adyen Instance
+        // 3. Initialize Adyen Checkout
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
@@ -48,12 +43,15 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
                 console.log("Payment Result:", result.resultCode);
                 if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
                     if (successOverlay) successOverlay.style.display = 'block';
-                    // Clean URL so a refresh doesn't trigger success again
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else if (result.resultCode === 'Refused') {
-                    alert("Payment Refused. Please try another card/method.");
+                    alert("Payment Refused.");
                 }
                 if (loader) loader.style.display = 'none';
+            },
+            // This is critical for Redirects to actually fire
+            onActionHandled: (data) => {
+                console.log("Action handled:", data);
             },
             onError: (error) => {
                 console.error("Adyen Error:", error);
@@ -62,28 +60,30 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        // 4. Create and Mount the Drop-in
-        activeDropin = checkoutInstance.create('dropin', {
-            showPayButton: false // Use Garuda Red Button instead
-        });
-        
-        activeDropin.mount('#dropin-container');
+        // 4. Create and Mount Drop-in
+        activeDropin = checkoutInstance.create('dropin', { 
+            showPayButton: false,
+            // Ensure redirect happens automatically if needed
+            instantPaymentTypes: ['alipay', 'wechatpay_web'] 
+        }).mount('#dropin-container');
 
-        // 5. Link the Garuda Red Button
+        // 5. LINK THE BUTTON (Ensuring the reference is fresh)
         const gaBtn = document.getElementById('ga-continue-btn');
         if (gaBtn) {
-            gaBtn.onclick = (e) => {
+            // Remove any old listeners to prevent double-firing
+            const newBtn = gaBtn.cloneNode(true);
+            gaBtn.parentNode.replaceChild(newBtn, gaBtn);
+            
+            newBtn.onclick = (e) => {
                 e.preventDefault();
                 console.log("Garuda Button Clicked - Submitting Drop-in");
                 if (activeDropin) {
                     activeDropin.submit();
-                } else {
-                    console.error("No active Drop-in instance found!");
                 }
             };
         }
 
-        // 6. Update UI Prices (Only if we have fresh session data)
+        // 6. Update Price Labels
         if (sessionData.amount) {
             document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
             document.querySelectorAll('.total-amount').forEach(el => {
@@ -98,7 +98,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
         if (loader) loader.style.display = 'none';
 
     } catch (error) {
-        console.error("Fatal Init Error:", error);
+        console.error("Init Error:", error);
         if (loader) loader.style.display = 'none';
     }
 };
@@ -112,5 +112,5 @@ if (selector) {
     };
 }
 
-// First run on page load
+// Start first load
 window.initCheckout('SG', 'SGD');
