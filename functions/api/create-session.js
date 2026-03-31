@@ -23,14 +23,35 @@ export async function onRequest(context) {
         "Content-Type": "application/json",
         "X-API-Key": env.ADYEN_API_KEY,
       },
-      body: JSON.stringify({
-        amount: { value: adyenValue, currency: currencyCode },
-        reference: `GARUDA_${countryCode}_${Date.now()}`,
-        merchantAccount: env.ADYEN_MERCHANT_ACCOUNT,
-        returnUrl: "https://ga-ady-demo.pages.dev",
-        countryCode: countryCode,
-        shopperLocale: countryCode === "ID" ? "id-ID" : "en-GB"
-      }),
+      // Inside your create-session.js
+body: JSON.stringify({
+    amount: { value: adyenValue, currency: currencyCode },
+    reference: `GARUDA_${countryCode}_${Date.now()}`,
+    merchantAccount: env.ADYEN_MERCHANT_ACCOUNT,
+    returnUrl: "https://ga-ady-demo.pages.dev",
+    countryCode: countryCode,
+    shopperLocale: countryCode === "ID" ? "id-ID" : "en-GB",
+    // GRABPAY REQUIREMENT: Add shopper data for risk checks
+    shopperEmail: "shopper@example.com",
+    shopperReference: "USER_12345",
+    deliveryAddress: {
+        city: "Singapore",
+        country: countryCode,
+        houseNumberOrName: "1",
+        postalCode: "018989",
+        street: "Marina Boulevard"
+    },
+    lineItems: [
+        {
+            quantity: 1,
+            amountExcludingTax: adyenValue,
+            taxAmount: 0,
+            amountIncludingTax: adyenValue,
+            description: "Garuda Indonesia Flight Ticket",
+            id: "item1"
+        }
+    ]
+}),
     });
 
     const data = await adyenResponse.json();
