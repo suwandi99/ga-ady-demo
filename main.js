@@ -1,31 +1,40 @@
-// ADD THIS TO THE TOP OF main.js
-const urlParams = new URLSearchParams(window.location.search);
-const sessionId = urlParams.get('sessionId');
-const redirectResult = urlParams.get('redirectResult');
+// 1. Wrap the redirect check in a 'load' listener 
+window.addEventListener('load', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('sessionId');
+    const redirectResult = urlParams.get('redirectResult');
 
-// If we see these in the URL, the shopper JUST came back from Alipay
-if (sessionId && redirectResult) {
-    console.log("Caught redirect result! Finalizing...");
-    
-    // Create a temporary checkout instance just to handle the result
-    AdyenCheckout({
-        environment: 'test',
-        clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
-        session: { id: sessionId },
-        onPaymentCompleted: (result) => {
-            console.log("Redirect Success:", result.resultCode);
-            if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
-                // Show the overlay immediately
-                document.getElementById('success-overlay').style.display = 'block';
-                // Clean the URL so it doesn't loop
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+    // 2. Only run if we have a redirect result AND the SDK is available
+    if (sessionId && redirectResult && typeof AdyenCheckout !== 'undefined') {
+        console.log("Caught redirect result! Finalizing with SDK...");
+        
+        try {
+            const checkout = await AdyenCheckout({
+                environment: 'test',
+                clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
+                session: { id: sessionId },
+                onPaymentCompleted: (result) => {
+                    console.log("Redirect Success:", result.resultCode);
+                    if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
+                        // Directly show the success overlay
+                        const overlay = document.getElementById('success-overlay');
+                        if (overlay) overlay.style.display = 'block';
+                        
+                        // Clean the URL so it doesn't trigger again on refresh
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }
+            });
+
+            // 3. Manually submit the details from the URL to the session
+            checkout.submitDetails({ details: { redirectResult } });
+            
+        } catch (err) {
+            console.error("Error during redirect finalization:", err);
         }
-    }).then(checkout => {
-        // Force the SDK to process the result from the URL
-        checkout.submitDetails({ details: { redirectResult } });
-    });
-}
+    }
+});
+
 
 let checkoutInstance = null;
 let activeDropin = null;
