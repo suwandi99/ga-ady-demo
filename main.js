@@ -6,7 +6,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     const container = document.getElementById('dropin-container');
     const successOverlay = document.getElementById('success-overlay');
     
-    // Check URL for redirect results
+    // 1. Detect if we are returning from a redirect (e.g., Alipay)
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('sessionId');
     const redirectResult = urlParams.get('redirectResult');
@@ -17,12 +17,13 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     try {
         let sessionData;
 
-        // If it's a manual country change, we IGNORE the URL parameters and force a new session
-        if (sessionId && redirectResult && !isManualChange) {
-            // CASE A: Shopper redirected back from Alipay/Redirect method
+        // 2. Determine if we resume a session or start a new one
+        if (sessionId && !isManualChange) {
+            // Shopper redirected back; use existing session ID to finalize results
             sessionData = { id: sessionId };
         } else {
-            // CASE B: Initial load or manual Country Selection change
+            // New session needed (initial load or manual country switch)
+            // Properly unmount previous secure fields to prevent "load count" errors
             if (activeDropin) { 
                 activeDropin.unmount(); 
                 activeDropin = null; 
@@ -36,33 +37,40 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
                 body: JSON.stringify({ countryCode, currencyCode })
             });
             
-            if (!response.ok) throw new Error("Backend failed");
+            if (!response.ok) throw new Error("Backend failed to create session");
             sessionData = await response.json();
         }
 
+        // 3. Initialize Adyen Checkout with your specific clientKey
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
             session: sessionData,
             onPaymentCompleted: (result) => {
+                console.log("Payment Result:", result.resultCode);
+                // Authorized or Pending status triggers the success screen
                 if (result.resultCode === 'Authorised' || result.resultCode === 'Pending') {
-                    document.getElementById('success-overlay').style.display = 'block';
-                    // Clean URL so refresh doesn't re-trigger success
+                    if (successOverlay) successOverlay.style.display = 'block';
+                    // Clear redirect parameters from the URL
                     window.history.replaceState({}, document.title, window.location.pathname);
-                } else {
-                    alert("Payment Status: " + result.resultCode);
+                } else if (result.resultCode === 'Refused') {
+                    alert("Payment Refused. Please try another payment method.");
                 }
             },
             onError: (error) => console.error("Adyen Error:", error),
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
+        // 4. Create and mount Drop-in
         activeDropin = checkoutInstance.create('dropin', { showPayButton: false });
         activeDropin.mount('#dropin-container');
 
-        document.getElementById('ga-continue-btn').onclick = () => activeDropin.submit();
+        // Link the Garuda Red Button in the sidebar to trigger the payment
+        const gaBtn = document.getElementById('ga-continue-btn');
+        if (gaBtn) gaBtn.onclick = () => activeDropin.submit();
 
-        // Update UI Prices (Only update labels if we aren't resuming a redirect)
+        // 5. Update Garuda UI Labels
+        // Skip label updates if only showing a redirect result, unless it was a manual change
         if (!sessionId || isManualChange) {
             document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
             document.querySelectorAll('.total-amount').forEach(el => {
@@ -78,19 +86,17 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
 
     } catch (error) {
         console.error("Checkout Error:", error);
-        container.innerHTML = `<p style="color:red; padding:20px;">Failed to load: ${error.message}</p>`;
+        if (container) container.innerHTML = `<p style="color:red; padding:20px;">Failed to load checkout.</p>`;
         if (loader) loader.style.display = 'none';
     }
 };
 
-// Update the dropdown listener to pass the 'isManualChange' flag as true
+// Listener for the Country Selection dropdown
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
         const opt = e.target.options[e.target.selectedIndex];
-        const country = e.target.value;
-        const currency = opt.getAttribute('data-currency');
-        // The third parameter 'true' forces a fresh session
-        window.initCheckout(country, currency, true);
+        // Passing 'true' for isManualChange forces a fresh session call
+        window.initCheckout(e.target.value, opt.getAttribute('data-currency'), true);
     };
 }
