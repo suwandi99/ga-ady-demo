@@ -1,4 +1,5 @@
 let checkoutInstance = null;
+let activeDropin = null; // Track the dropin component specifically
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
@@ -8,7 +9,18 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     if (loader) loader.style.display = 'block';
     if (successOverlay) successOverlay.style.display = 'none';
 
-    // Force a complete reset of the Drop-in UI
+    // --- CRITICAL FIX: DESTROY PREVIOUS SECURE FIELDS ---
+    if (activeDropin) {
+        try {
+            // Unmount the dropin component to remove iframes properly
+            activeDropin.unmount();
+        } catch (e) {
+            console.error("Error unmounting dropin:", e);
+        }
+        activeDropin = null;
+    }
+    
+    // Clear the HTML and reset the checkout instance
     container.innerHTML = ''; 
     checkoutInstance = null;
 
@@ -22,7 +34,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         if (!response.ok) throw new Error("Backend failed to create session");
         const sessionData = await response.json();
 
-        // Initialize a brand new Adyen instance
+        // 1. Initialize Adyen Checkout
         checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
@@ -35,14 +47,18 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        const dropin = checkoutInstance.create('dropin', {
+        // 2. Create the dropin and store it in activeDropin
+        activeDropin = checkoutInstance.create('dropin', {
             showPayButton: false 
-        }).mount('#dropin-container');
+        });
 
-        // Re-bind the external Garuda Red Button
-        document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
+        // 3. Mount the dropin
+        activeDropin.mount('#dropin-container');
 
-        // Aggressively update all price labels in the UI
+        // Link the Garuda Red Button to the specific active instance
+        document.getElementById('ga-continue-btn').onclick = () => activeDropin.submit();
+
+        // Update UI Price Labels
         document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
         document.querySelectorAll('.total-amount').forEach(el => {
             const val = sessionData.amount.value / 100;
@@ -61,7 +77,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     }
 };
 
-// Dropdown listener for country change
+// Dropdown listener
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
