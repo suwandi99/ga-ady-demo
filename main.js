@@ -1,20 +1,25 @@
-// Keep the instance global to prevent multiple overlays
-let currentCheckout = null;
+// Global variable to track and destroy the previous instance
+let adyenCheckoutInstance = null;
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
     const container = document.getElementById('dropin-container');
     const successOverlay = document.getElementById('success-overlay');
     
-    // Show loader and clear container immediately
     if (loader) loader.style.display = 'block';
     if (successOverlay) successOverlay.style.display = 'none';
     
-    // Completely wipe the container to force a fresh Adyen load
-    container.innerHTML = '<p style="text-align:center;">Updating local payment methods...</p>';
+    // --- DEEP RESET ---
+    // 1. Clear the HTML container
+    container.innerHTML = ''; 
+    // 2. If an instance already exists, unmount it to free up the session
+    if (adyenCheckoutInstance) {
+        // This is the official way to kill the previous session state
+        adyenCheckoutInstance = null; 
+    }
 
     try {
-        // 1. Fetch from your specific API path
+        // Fetch from your specific API path
         const response = await fetch('/api/create-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -24,15 +29,12 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         if (!response.ok) throw new Error("Backend failed to create session");
         const sessionData = await response.json();
 
-        // 2. Clear "Updating..." message before mounting new Adyen UI
-        container.innerHTML = ''; 
-
-        // 3. Initialize Adyen Checkout
-        // We use a local variable to ensure we don't conflict with previous runs
-        const checkout = await AdyenCheckout({
+        // --- RE-INITIALIZE CHECKOUT ---
+        // We create a fresh instance with the new sessionData
+        adyenCheckoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
-            session: sessionData,
+            session: sessionData, // The raw JSON from your /sessions response
             onPaymentCompleted: (result) => {
                 if (result.resultCode === 'Authorised' || result.resultCode === 'Pending') {
                     document.getElementById('success-overlay').style.display = 'block';
@@ -41,21 +43,22 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
                 }
             },
             onError: (error) => console.error("Adyen Error:", error),
+            // Ensure the UI language and method sorting matches the country
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        // 4. Create and mount Drop-in
-        const dropin = checkout.create('dropin', {
+        // --- MOUNT NEW DROP-IN ---
+        const dropin = adyenCheckoutInstance.create('dropin', {
             showPayButton: false 
         }).mount('#dropin-container');
 
-        // 5. Update the Garuda Red Button Click Event
+        // Link the Garuda Red Button
         document.getElementById('ga-continue-btn').onclick = (e) => {
             e.preventDefault();
             dropin.submit();
         };
 
-        // 6. Update UI Price Labels
+        // Update UI Price Labels
         document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
         document.querySelectorAll('.total-amount').forEach(el => {
             const val = sessionData.amount.value / 100;
@@ -70,20 +73,18 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     } catch (error) {
         console.error("Initialization Error:", error);
         container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">
-            <strong>Error:</strong> ${error.message}<br>Check console for details.</p>`;
+            <strong>Error:</strong> ${error.message}</p>`;
         if (loader) loader.style.display = 'none';
     }
 };
 
-// Setup the dropdown listener once
-document.addEventListener('DOMContentLoaded', () => {
-    const selector = document.getElementById('country-selector');
-    if (selector) {
-        selector.onchange = (e) => {
-            const opt = e.target.options[e.target.selectedIndex];
-            const country = e.target.value;
-            const currency = opt.getAttribute('data-currency');
-            window.initCheckout(country, currency);
-        };
-    }
-});
+// Dropdown listener
+const countrySelector = document.getElementById('country-selector');
+if (countrySelector) {
+    countrySelector.onchange = (e) => {
+        const opt = e.target.options[e.target.selectedIndex];
+        const country = e.target.value;
+        const currency = opt.getAttribute('data-currency');
+        window.initCheckout(country, currency);
+    };
+}
