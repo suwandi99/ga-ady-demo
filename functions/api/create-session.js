@@ -1,12 +1,10 @@
 export async function onRequest(context) {
   const { env, request } = context;
   
-  // 1. Defaults
   let countryCode = "SG";
   let currencyCode = "SGD";
   const baseAmountSGD = 379.70;
 
-  // 2. Parse selection from frontend
   if (request.method === "POST") {
     const body = await request.json();
     countryCode = body.countryCode || "SG";
@@ -14,16 +12,11 @@ export async function onRequest(context) {
   }
 
   try {
-    // 3. Get Live FX Rates
     const fxResponse = await fetch(`https://open.er-api.com/v6/latest/SGD`);
     const fxData = await fxResponse.json();
     const rate = fxData.rates[currencyCode] || 1;
-    
-    // 4. Calculate localized amount
-    const convertedAmount = baseAmountSGD * rate;
-    const adyenValue = Math.round(convertedAmount * 100);
+    const adyenValue = Math.round(baseAmountSGD * rate * 100);
 
-    // 5. Call Adyen Sessions
     const adyenResponse = await fetch("https://checkout-test.adyen.com/v71/sessions", {
       method: "POST",
       headers: {
@@ -42,7 +35,7 @@ export async function onRequest(context) {
 
     const data = await adyenResponse.json();
     
-    // Return the Adyen response directly
+    // Return only the JSON object from Adyen
     return new Response(JSON.stringify(data), { 
       headers: { "Content-Type": "application/json" } 
     });
