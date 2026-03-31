@@ -1,3 +1,4 @@
+// 1. Keep these variables global so the click listener can always find them
 let checkoutInstance = null;
 let activeDropin = null;
 
@@ -6,7 +7,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     const container = document.getElementById('dropin-container');
     const successOverlay = document.getElementById('success-overlay');
     
-    // 1. Detect if we are returning from a redirect
+    // Check URL for Adyen redirect markers (e.g., after returning from Alipay)
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('sessionId');
 
@@ -16,11 +17,16 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     try {
         let sessionData;
 
-        // 2. Determine Session Logic
+        // 2. Decide: Resume existing session from URL or Create new one
         if (sessionId && !isManualChange) {
+            // Shopper returned from redirect; use the existing ID to finalize
             sessionData = { id: sessionId };
         } else {
-            if (activeDropin) { activeDropin.unmount(); activeDropin = null; }
+            // New session: Standard reset to prevent SecureFields errors
+            if (activeDropin) { 
+                activeDropin.unmount(); 
+                activeDropin = null; 
+            }
             container.innerHTML = ''; 
             checkoutInstance = null;
 
@@ -30,7 +36,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
                 body: JSON.stringify({ countryCode, currencyCode })
             });
             
-            if (!response.ok) throw new Error("Backend failed");
+            if (!response.ok) throw new Error("Backend failed to create session");
             sessionData = await response.json();
         }
 
@@ -40,50 +46,33 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
             session: sessionData,
             onPaymentCompleted: (result) => {
-                console.log("Payment Result:", result.resultCode);
+                console.log("Payment Result Status:", result.resultCode);
+                
+                // Show success overlay for Authorized, Pending, or Received statuses
                 if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
                     if (successOverlay) successOverlay.style.display = 'block';
+                    // Clean URL so a refresh doesn't trigger the success logic again
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else if (result.resultCode === 'Refused') {
-                    alert("Payment Refused.");
+                    alert("Payment Refused. Please try another method.");
                 }
+                
                 if (loader) loader.style.display = 'none';
             },
-            // This is critical for Redirects to actually fire
-            onActionHandled: (data) => {
-                console.log("Action handled:", data);
-            },
             onError: (error) => {
-                console.error("Adyen Error:", error);
+                console.error("Adyen SDK Error:", error);
                 if (loader) loader.style.display = 'none';
             },
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
         // 4. Create and Mount Drop-in
+        // We mount it even on redirect return so the SDK can process the URL parameters
         activeDropin = checkoutInstance.create('dropin', { 
-            showPayButton: false,
-            // Ensure redirect happens automatically if needed
-            instantPaymentTypes: ['alipay', 'wechatpay_web'] 
+            showPayButton: false 
         }).mount('#dropin-container');
 
-        // 5. LINK THE BUTTON (Ensuring the reference is fresh)
-        const gaBtn = document.getElementById('ga-continue-btn');
-        if (gaBtn) {
-            // Remove any old listeners to prevent double-firing
-            const newBtn = gaBtn.cloneNode(true);
-            gaBtn.parentNode.replaceChild(newBtn, gaBtn);
-            
-            newBtn.onclick = (e) => {
-                e.preventDefault();
-                console.log("Garuda Button Clicked - Submitting Drop-in");
-                if (activeDropin) {
-                    activeDropin.submit();
-                }
-            };
-        }
-
-        // 6. Update Price Labels
+        // 5. Update Garuda UI Price Labels
         if (sessionData.amount) {
             document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
             document.querySelectorAll('.total-amount').forEach(el => {
@@ -99,11 +88,27 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
 
     } catch (error) {
         console.error("Init Error:", error);
+        if (container) container.innerHTML = `<p style="color:red; padding:20px;">Error loading checkout.</p>`;
         if (loader) loader.style.display = 'none';
     }
 };
 
-// Dropdown Listener
+// 6. GLOBAL BUTTON LISTENER
+// This ensures the Garuda Red Button always works, even if the Drop-in reloads
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('#ga-continue-btn');
+    if (btn) {
+        e.preventDefault();
+        console.log("Garuda Button Clicked - Submitting active Drop-in");
+        if (activeDropin) {
+            activeDropin.submit();
+        } else {
+            console.error("No active Drop-in found to submit.");
+        }
+    }
+});
+
+// 7. Country Selector Listener
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
@@ -112,5 +117,5 @@ if (selector) {
     };
 }
 
-// Start first load
+// 8. Initial Load on Page Entry
 window.initCheckout('SG', 'SGD');
