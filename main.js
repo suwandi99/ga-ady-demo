@@ -17,20 +17,22 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     try {
         let checkoutConfig;
 
-        // 2. Determine if we are returning from a redirect OR starting fresh
+        // 2. LOGIC: Determine if we are finalizing a redirect OR starting fresh
+        // If it is a manual country change, we ignore the URL parameters entirely.
         if (sessionId && redirectResult && !isManualChange) {
             // CASE A: FINALIZING A REDIRECT
-            // We pass the sessionId AND the redirectResult directly to the configuration
+            // Pass the sessionId and the redirectResult directly to the configuration
             checkoutConfig = {
                 environment: 'test',
                 clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6',
                 session: { 
                     id: sessionId,
-                    data: redirectResult // Explicitly pass the redirect data back to the session
+                    data: redirectResult // Pass redirect data back to the session 
                 }
             };
         } else {
             // CASE B: INITIAL LOAD OR COUNTRY SWITCH
+            // Completely destroy any previous secure fields instance [cite: 1682-1686]
             if (activeDropin) { 
                 activeDropin.unmount(); 
                 activeDropin = null; 
@@ -38,6 +40,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
             container.innerHTML = ''; 
             checkoutInstance = null;
 
+            // Fetch a fresh session from your Cloudflare API path
             const response = await fetch('/api/create-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -54,13 +57,13 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
             };
         }
 
-        // 3. Common Configuration (Callbacks & Locale)
+        // 3. Set standard Adyen Checkout behaviors
         checkoutConfig.onPaymentCompleted = (result) => {
             console.log("Payment Result Status:", result.resultCode);
-            // Check for success statuses
+            // Authorised, Pending, and Received are successful outcomes 
             if (['Authorised', 'Pending', 'Received'].includes(result.resultCode)) {
                 if (successOverlay) successOverlay.style.display = 'block';
-                // Remove messy URL parameters for a clean experience
+                // Remove redirect parameters from URL for a clean state
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else {
                 alert("Payment Status: " + result.resultCode);
@@ -69,21 +72,23 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
         checkoutConfig.onError = (error) => console.error("Adyen SDK Error:", error);
         checkoutConfig.locale = countryCode === 'ID' ? "id-ID" : "en-GB";
 
-        // 4. Initialize and Mount
+        // 4. Initialize the Checkout and Mount Drop-in
         checkoutInstance = await AdyenCheckout(checkoutConfig);
         activeDropin = checkoutInstance.create('dropin', { showPayButton: false });
         activeDropin.mount('#dropin-container');
 
-        // Link external Garuda Red Button
+        // Link the external Garuda Red Button ("Continue Payment") [cite: 604]
         const gaBtn = document.getElementById('ga-continue-btn');
         if (gaBtn) gaBtn.onclick = () => activeDropin.submit();
 
-        // 5. Update UI Price Labels (Skip if resuming a redirect unless it was manual)
+        // 5. Update UI Price Labels
+        // Update only if we are on a fresh session (or manual change)
         if (!sessionId || isManualChange) {
             document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
             document.querySelectorAll('.total-amount').forEach(el => {
-                // Ensure sessionData is available for these updates
-                const amountValue = checkoutConfig.session.amount ? checkoutConfig.session.amount.value : 0;
+                // Determine the correct amount from either case
+                const sessionObj = checkoutConfig.session;
+                const amountValue = sessionObj.amount ? sessionObj.amount.value : 0;
                 if (amountValue) {
                     el.innerText = (amountValue / 100).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -102,11 +107,12 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD', i
     }
 };
 
-// Dropdown change listener
+// Setup the Dropdown listener
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
         const opt = e.target.options[e.target.selectedIndex];
+        // The 'true' flag ensures the script ignores URL redirect params 
         window.initCheckout(e.target.value, opt.getAttribute('data-currency'), true);
     };
 }
