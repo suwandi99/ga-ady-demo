@@ -1,4 +1,4 @@
-let adyenCheckoutInstance = null; // Track the current instance
+let checkoutInstance = null;
 
 window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     const loader = document.getElementById('loading-overlay');
@@ -8,13 +8,11 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     if (loader) loader.style.display = 'block';
     if (successOverlay) successOverlay.style.display = 'none';
 
-    // 1. CLEAR PREVIOUS INSTANCE
-    // This removes the old iframe and clears internal SDK state
+    // Force a complete reset of the Drop-in UI
     container.innerHTML = ''; 
-    adyenCheckoutInstance = null;
+    checkoutInstance = null;
 
     try {
-        // 2. FETCH LOCALIZED SESSION
         const response = await fetch('/api/create-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -22,38 +20,36 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
         });
 
         if (!response.ok) throw new Error("Backend failed to create session");
-        const session = await response.json();
+        const sessionData = await response.json();
 
-        // 3. INITIALIZE ADYEN
-        adyenCheckoutInstance = await AdyenCheckout({
+        // Initialize a brand new Adyen instance
+        checkoutInstance = await AdyenCheckout({
             environment: 'test',
             clientKey: 'test_767VMJ3TGVG53LK5KUWJZSL5KAZWTIT6', 
-            session: session, // Use the direct object from backend
+            session: sessionData,
             onPaymentCompleted: (result) => {
                 if (result.resultCode === 'Authorised' || result.resultCode === 'Pending') {
                     document.getElementById('success-overlay').style.display = 'block';
                 }
             },
-            // Update locale to show local payment names for Indonesia
             locale: countryCode === 'ID' ? "id-ID" : "en-GB"
         });
 
-        // 4. MOUNT DROP-IN
-        const dropin = adyenCheckoutInstance.create('dropin', {
+        const dropin = checkoutInstance.create('dropin', {
             showPayButton: false 
         }).mount('#dropin-container');
 
-        // Link the Garuda Red Button in the sidebar
+        // Re-bind the external Garuda Red Button
         document.getElementById('ga-continue-btn').onclick = () => dropin.submit();
 
-        // 5. UPDATE SIDEBAR PRICE LABELS
+        // Aggressively update all price labels in the UI
         document.querySelectorAll('.currency').forEach(el => el.innerText = currencyCode);
         document.querySelectorAll('.total-amount').forEach(el => {
-            const majorAmount = (session.amount.value / 100).toLocaleString(undefined, {
+            const val = sessionData.amount.value / 100;
+            el.innerText = val.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            el.innerText = majorAmount;
         });
 
         if (loader) loader.style.display = 'none';
@@ -65,7 +61,7 @@ window.initCheckout = async function(countryCode = 'SG', currencyCode = 'SGD') {
     }
 };
 
-// Setup dropdown change listener
+// Dropdown listener for country change
 const selector = document.getElementById('country-selector');
 if (selector) {
     selector.onchange = (e) => {
